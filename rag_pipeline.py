@@ -163,9 +163,12 @@ class RAGPipeline:
         """Generates a final answer using the Gemini model with the retrieved context."""
         logger.info("Generating final answer with Gemini...")
         context = "\n\n".join(retrieved_chunks)
-        prompt = f"""You are a helpful assistant for answering questions based on a provided document.
-Use the context below to answer the question accurately. If the context doesn't contain the answer, say so.
+        prompt = f"""You are an expert assistant helping users understand details from an insurance policy document.
 
+Use only the information provided in the context below to answer the question. 
+If the answer is not found in the context, respond with: "Not mentioned in the provided context."
+
+Provide your answer in a clear and concise format.
 Context:
 ---
 {context}

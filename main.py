@@ -112,4 +112,8 @@ app.include_router(api_router)
 
 @app.get("/", summary="Health Check")
 def read_root():
-    return {"status": "API is running. Go to /docs for interactive documentation."}
+    return {"status": "API is running."}
+
+@app.get("/api/v1")
+def read_welcome():
+    return {"Greet": "Welcome to Bajaj Finserv"}

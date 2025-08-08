@@ -8,7 +8,7 @@ python-dotenv==1.0.1
 
 # ML & Data Processing Libraries
 sentence-transformers==2.7.0
-faiss-gpu==1.8.0
+faiss-gpu==1.7.2
 google-generativeai==0.6.0
 PyPDF2==3.0.1
 networkx==3.3
