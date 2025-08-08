@@ -1,0 +1,19 @@
+# Python package dependencies for the RAG API project.
+# Install with: pip install -r requirements.txt
+
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.1
+python-dotenv==1.0.1
+
+# ML & Data Processing Libraries
+sentence-transformers==2.7.0
+faiss-cpu==1.8.0
+google-generativeai==0.6.0
+PyPDF2==3.0.1
+networkx==3.3
+scikit-learn==1.5.0
+requests==2.32.3
+numpy==1.26.4
+torch==2.3.0
+torchaudio==2.3.0
