@@ -28,7 +28,7 @@ class RAGPipeline:
         # --- Configuration ---
         self.CHUNK_SIZE = 300
         self.OVERLAP = 50
-        self.SIMILARITY_THRESHOLD = 0.75
+        self.SIMILARITY_THRESHOLD = 0.75 
         self.NEIGHBORS_TO_FETCH = 3
         self.TOP_K_FAISS = 5
 
@@ -163,21 +163,15 @@ class RAGPipeline:
         """Generates a final answer using the Gemini model with the retrieved context."""
         logger.info("Generating final answer with Gemini...")
         context = "\n\n".join(retrieved_chunks)
-        prompt = f"""You are an expert assistant helping users understand details from an insurance policy document.
+        prompt = f"""You are answering a question using the following insurance policy context make it precise and to the point.
 
-Use only the information provided in the context below to answer the question. 
-If the answer is not found in the context, respond with: "Not mentioned in the provided context."
+            Context:
+            {context}
 
-Provide your answer in a clear and concise format.
-Context:
----
-{context}
----
+            Question:
+            {original_query}
 
-Question:
-{original_query}
-
-Answer:"""
+            Answer: """
         
         try:
             response = self.gemini.generate_content(prompt)
