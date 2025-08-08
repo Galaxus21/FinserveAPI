@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Environment variables file (contains secrets)
+.env
+
+# IDE and editor specific folders
+.vscode/
+.idea/
