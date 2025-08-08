@@ -6,7 +6,6 @@ import requests
 import faiss
 import networkx as nx
 import numpy as np
-import google.generativeai as genai
 import torch # Added for GPU detection
 from sklearn.preprocessing import normalize
 from sklearn.metrics.pairwise import cosine_similarity
@@ -14,12 +13,16 @@ from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
 import logging
 
+# --- OPENAI CHANGE ---
+# Import the OpenAI library
+from openai import OpenAI
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class RAGPipeline:
-    def __init__(self, genai_key: str, embed_model_name: str = "BAAI/bge-small-en-v1.5"):
+    def __init__(self, openai_api_key: str, embed_model_name: str = "BAAI/bge-small-en-v1.5"):
         """
         Initializes the RAG pipeline, loading models and setting up configurations.
         """
@@ -32,13 +35,12 @@ class RAGPipeline:
         self.NEIGHBORS_TO_FETCH = 3
         self.TOP_K_FAISS = 5
 
-        # --- Model and API Setup ---
-        if not genai_key:
-            raise ValueError("GENAI_KEY is required for the RAG pipeline.")
-            
-        genai.configure(api_key=genai_key)
-        # Updated Gemini model name
-        self.gemini = genai.GenerativeModel("gemini-2.0-flash-lite")
+        # --- OPENAI CHANGE: Model and API Setup ---
+        if not openai_api_key:
+            raise ValueError("OPENAI_API_KEY is required for the RAG pipeline.")
+        
+        # Initialize the OpenAI client with the API key
+        self.openai_client = OpenAI(api_key=openai_api_key)
         
         # Determine the device to use (GPU if available, otherwise CPU)
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -91,7 +93,6 @@ class RAGPipeline:
     def _get_embeddings(self, chunks: list[str]) -> np.ndarray:
         """Generates and normalizes embeddings for text chunks."""
         logger.info("Generating embeddings...")
-        # Prepending "passage: " as recommended by the BGE model documentation for retrieval tasks
         embeddings = self.embedder.encode([f"passage: {c}" for c in chunks], convert_to_numpy=True)
         logger.info("Embeddings generated.")
         return normalize(embeddings)
@@ -125,7 +126,6 @@ class RAGPipeline:
     def process_document(self, doc_url: str):
         """
         Main method to process a document: download, chunk, embed, and index.
-        This prepares the pipeline for answering questions.
         """
         logger.info("--- Starting new document processing ---")
         raw_text = self._download_and_extract_text(doc_url)
@@ -142,13 +142,11 @@ class RAGPipeline:
             raise RuntimeError("Pipeline is not ready. Please process a document first.")
         
         logger.info(f"Retrieving chunks for query: '{query[:50]}...'")
-        # Prepending "query: " as recommended by the BGE model documentation
         q_embed = self.embedder.encode([f"query: {query}"], convert_to_numpy=True)
         q_embed = normalize(q_embed)
         
         _, indices = self.faiss_index.search(q_embed, self.TOP_K_FAISS)
         
-        # Combine FAISS results with graph neighbors for richer context
         base_indices = set(indices[0])
         for i in indices[0]:
             if self.graph.has_node(i):
@@ -160,25 +158,31 @@ class RAGPipeline:
         return retrieved
 
     def _generate_answer(self, original_query: str, retrieved_chunks: list[str]) -> str:
-        """Generates a final answer using the Gemini model with the retrieved context."""
-        logger.info("Generating final answer with Gemini...")
+        """Generates a final answer using the OpenAI model with the retrieved context."""
+        logger.info("Generating final answer with OpenAI...")
         context = "\n\n".join(retrieved_chunks)
-        prompt = f"""You are answering a question using the following insurance policy context make it precise and to the point.
+        system_prompt = "You are a friendly and helpful AI assistant designed to answer questions about an insurance policy. Please provide a clear and concise answer based only on the text from the document provided. It's important not to add any information that isn't in the text. If the answer isn't available in the document, simply let the user know that the information could not be found."
 
-            Context:
-            {context}
+        user_prompt = f"""Context:
+---
+{context}
+---
 
-            Question:
-            {original_query}
-
-            Answer: """
+Question: {original_query}"""
         
         try:
-            response = self.gemini.generate_content(prompt)
+            response = self.openai_client.chat.completions.create(
+                model="gpt-4o-mini",  # A fast and cost-effective model
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.0, # Setting to 0 for factual, deterministic answers
+            )
             logger.info("Answer generated successfully.")
-            return response.text.strip()
+            return response.choices[0].message.content.strip()
         except Exception as e:
-            logger.error(f"Error during Gemini content generation: {e}")
+            logger.error(f"Error during OpenAI API call: {e}")
             return "Error: Could not generate an answer."
 
     def answer_questions(self, questions: list[str]) -> list[str]:

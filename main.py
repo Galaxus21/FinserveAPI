@@ -22,6 +22,8 @@ load_dotenv() # Load environment variables from a .env file
 # In a real app, use a more robust secrets management system.
 SECURITY_TOKEN = os.getenv("SECURITY_TOKEN", "128c33fc16f4a70cab19dab48958d5bf246e7003a8bfd7eb0be2f617b48e662a")
 GENAI_KEY = os.getenv("GENAI_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 
 # This dictionary will hold our initialized RAG pipeline instance.
 # It's populated during the 'startup' event.
@@ -35,9 +37,10 @@ async def lifespan(app: FastAPI):
     and the 'shutdown' part can be used for cleanup.
     """
     print("--- Server starting up ---")
-    if not GENAI_KEY:
-        raise RuntimeError("GENAI_KEY environment variable not set. Please create a .env file.")
-    ml_models["rag_pipeline"] = RAGPipeline(genai_key=GENAI_KEY)
+    # In main.py, inside the lifespan function
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY environment variable not set.")
+    ml_models["rag_pipeline"] = RAGPipeline(openai_api_key=OPENAI_API_KEY)
     print("--- RAG Pipeline Initialized ---")
     yield
     # Clean up the ML models and release the resources
