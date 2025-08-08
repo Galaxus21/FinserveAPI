@@ -41,4 +41,4 @@ COPY . .
 EXPOSE $PORT
 
 # Define the command to run your application using the installed uvicorn.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
