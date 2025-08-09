@@ -21,6 +21,7 @@ WORKDIR /code
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV SENTENCE_TRANSFORMERS_HOME=/tmp/sentence_transformers_cache
+ENV NLTK_DATA=/tmp/nltk_data
 
 # Copy the requirements file into the container first to leverage Docker's caching.
 COPY requirements.txt .
@@ -32,8 +33,10 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Pre-download the sentence-transformer model during the build phase.
 # This prevents timeouts when the application starts.
-RUN python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
-
+RUN python3 -c "from sentence_transformers import SentenceTransformer, CrossEncoder; import nltk; \
+    SentenceTransformer('BAAI/bge-small-en-v1.5'); \
+    CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2'); \
+    nltk.download('punkt_tab', download_dir='/tmp/nltk_data')"
 # Copy the rest of your application's source code into the container.
 COPY . .
 

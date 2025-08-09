@@ -8,3 +8,5 @@ __pycache__/
 # IDE and editor specific folders
 .vscode/
 .idea/
+downloaded_doc.pdf
+cache
