@@ -12,6 +12,8 @@ import nltk
 import numpy as np
 import hashlib
 import pdfplumber
+import docx
+import eml_parser
 from sklearn.preprocessing import normalize
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer, CrossEncoder
@@ -110,49 +112,49 @@ class RAGPipeline:
         return markdown_string
 
     def _download_and_extract_text(self, url: str) -> str:
+        """
+        Downloads a file from a URL and extracts text content based on its type.
+        """
         logger.info(f"Downloading and extracting text from {url}...")
-        local_path = "downloaded_doc.pdf"
-        if not os.path.exists(local_path):
-             with open(local_path, "wb") as f:
-                f.write(requests.get(url).content)
+        
+        # Determine file extension from URL
+        file_extension = url.split('?')[0].split('.')[-1].lower()
+        local_path = f"downloaded_doc.{file_extension}"
+
+        with open(local_path, "wb") as f:
+            f.write(requests.get(url).content)
 
         full_text = ""
-        with pdfplumber.open(local_path) as pdf:
-            for page in pdf.pages:
-                # Extract text and tables, then sort them by their vertical position
-                words = page.extract_words(x_tolerance=2, y_tolerance=2, keep_blank_chars=True)
-                tables = page.find_tables()
-                
-                elements = []
-                for word in words:
-                    elements.append({'type': 'text', 'content': word['text'], 'top': word['top'], 'x0': word['x0']})
-                
-                for table in tables:
-                    if table.extract():
-                        elements.append({'type': 'table', 'content': table.extract(), 'top': table.bbox[1]})
+        if file_extension == 'pdf':
+            with pdfplumber.open(local_path) as pdf:
+                # (Your existing PDF extraction logic)
+                for page in pdf.pages:
+                    full_text += page.extract_text() + "\n"
+                    for table in page.find_tables():
+                        if table.extract():
+                            full_text += "\n" + self._table_to_markdown(table.extract()) + "\n"
+        
+        elif file_extension == 'docx':
+            doc = docx.Document(local_path)
+            for para in doc.paragraphs:
+                full_text += para.text + "\n"
+            for table in doc.tables:
+                table_data = []
+                for row in table.rows:
+                    table_data.append([cell.text for cell in row.cells])
+                full_text += "\n" + self._table_to_markdown(table_data) + "\n"
 
-                elements.sort(key=lambda x: x['top'])
+        elif file_extension == 'eml':
+            with open(local_path, 'rb') as f:
+                raw_email = f.read()
+            ep = eml_parser.EmlParser()
+            parsed_eml = ep.decode_email_bytes(raw_email)
+            if parsed_eml['body']:
+                full_text = parsed_eml['body'][0]['content']
 
-                # Reconstruct the text flow
-                current_line = []
-                last_top = -1
-                for el in elements:
-                    if el['type'] == 'text':
-                        if abs(el['top'] - last_top) > 5 and last_top != -1: # New line detected
-                            full_text += " ".join(current_line) + "\n"
-                            current_line = []
-                        current_line.append(el['content'])
-                        last_top = el['top']
-                    else: # It's a table
-                        if current_line:
-                            full_text += " ".join(current_line) + "\n"
-                            current_line = []
-                        full_text += "\n" + self._table_to_markdown(el['content']) + "\n"
-                        last_top = -1 # Reset line tracking after a table
-                
-                if current_line:
-                    full_text += " ".join(current_line)
-                full_text += "\n\n"
+        else:
+            raise ValueError(f"Unsupported file type: {file_extension}")
+            
         return full_text
 
     def _chunk_text(self, text: str) -> list[str]:
@@ -268,6 +270,8 @@ Answer:"""
         """
         if not self.is_ready:
             raise RuntimeError("Pipeline not ready.")
+        
+        logger.info(".........ANSWERING QUESTIONS........")
         
         with ThreadPoolExecutor() as executor:
             answers = list(executor.map(self._process_single_question, questions))
