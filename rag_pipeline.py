@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 nltk.data.path.append('/tmp/nltk_data')
 
-nltk.download("punkt_tab", quiet=True)
+nltk.download("punkt", quiet=True)
 
 class RAGPipeline:
     def __init__(self, openai_api_key: str, 
