@@ -32,7 +32,9 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 RUN python3 -c "from sentence_transformers import SentenceTransformer, CrossEncoder; import nltk; \
     SentenceTransformer('BAAI/bge-small-en-v1.5'); \
     CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2'); \
+    nltk.download('punkt_tab', download_dir='/tmp/nltk_data'); \
     nltk.download('punkt', download_dir='/tmp/nltk_data')"
+    
 
 # Copy the rest of your application's source code into the container.
 COPY . .
