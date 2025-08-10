@@ -32,8 +32,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 RUN python3 -c "from sentence_transformers import SentenceTransformer, CrossEncoder; import nltk; \
     SentenceTransformer('BAAI/bge-small-en-v1.5'); \
     CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2'); \
-    nltk.download('punkt_tab', download_dir='/tmp/nltk_data'); \
-    nltk.download('punkt', download_dir='/tmp/nltk_data')"
+    nltk.download('punkt_tab', download_dir='/tmp/nltk_data')"
     
 
 # Copy the rest of your application's source code into the container.
@@ -44,4 +43,4 @@ EXPOSE 8000
 
 # Use the $PORT environment variable provided by Cloud Run at runtime.
 # The ${PORT:-8080} syntax provides a default value for local testing.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
