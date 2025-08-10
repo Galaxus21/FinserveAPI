@@ -1,6 +1,6 @@
 # rag_pipeline.py
 # This file contains the core logic for the Retrieval-Augmented Generation pipeline
-# with reranking, caching, and parallel processing.
+# with table extraction, reranking, caching, and parallel processing.
 
 import os
 import re
@@ -11,6 +11,7 @@ import networkx as nx
 import nltk
 import numpy as np
 import hashlib
+import pdfplumber
 from sklearn.preprocessing import normalize
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer, CrossEncoder
@@ -25,8 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Download necessary NLTK data (corrected from 'punkt_tab')
-nltk.download("punkt", quiet=True)
+nltk.download("punkt_tab", quiet=True)
 
 class RAGPipeline:
     def __init__(self, openai_api_key: str, 
@@ -92,13 +92,66 @@ class RAGPipeline:
         logger.info("Cache loaded successfully.")
         return chunks, embeddings, faiss_index
 
+    def _table_to_markdown(self, table_data):
+        if not table_data:
+            return ""
+        num_cols = max(len(row) for row in table_data)
+        markdown_string = ""
+        header = [(cell if cell is not None else "") for cell in table_data[0]]
+        header += [""] * (num_cols - len(header))
+        markdown_string += "| " + " | ".join(str(cell).replace("|", "\\|") for cell in header) + " |\n"
+        markdown_string += "|" + "|".join(["---"] * num_cols) + "|\n"
+        for row in table_data[1:]:
+            row = [(cell if cell is not None else "") for cell in row]
+            row += [""] * (num_cols - len(row))
+            markdown_string += "| " + " | ".join(str(cell).replace("|", "\\|") for cell in row) + " |\n"
+        return markdown_string
+
     def _download_and_extract_text(self, url: str) -> str:
-        logger.info(f"Downloading document from {url}...")
+        logger.info(f"Downloading and extracting text from {url}...")
         local_path = "downloaded_doc.pdf"
-        with open(local_path, "wb") as f:
-            f.write(requests.get(url).content)
-        reader = PdfReader(local_path)
-        return "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
+        if not os.path.exists(local_path):
+             with open(local_path, "wb") as f:
+                f.write(requests.get(url).content)
+
+        full_text = ""
+        with pdfplumber.open(local_path) as pdf:
+            for page in pdf.pages:
+                # Extract text and tables, then sort them by their vertical position
+                words = page.extract_words(x_tolerance=2, y_tolerance=2, keep_blank_chars=True)
+                tables = page.find_tables()
+                
+                elements = []
+                for word in words:
+                    elements.append({'type': 'text', 'content': word['text'], 'top': word['top'], 'x0': word['x0']})
+                
+                for table in tables:
+                    if table.extract():
+                        elements.append({'type': 'table', 'content': table.extract(), 'top': table.bbox[1]})
+
+                elements.sort(key=lambda x: x['top'])
+
+                # Reconstruct the text flow
+                current_line = []
+                last_top = -1
+                for el in elements:
+                    if el['type'] == 'text':
+                        if abs(el['top'] - last_top) > 5 and last_top != -1: # New line detected
+                            full_text += " ".join(current_line) + "\n"
+                            current_line = []
+                        current_line.append(el['content'])
+                        last_top = el['top']
+                    else: # It's a table
+                        if current_line:
+                            full_text += " ".join(current_line) + "\n"
+                            current_line = []
+                        full_text += "\n" + self._table_to_markdown(el['content']) + "\n"
+                        last_top = -1 # Reset line tracking after a table
+                
+                if current_line:
+                    full_text += " ".join(current_line)
+                full_text += "\n\n"
+        return full_text
 
     def _chunk_text(self, text: str) -> list[str]:
         logger.info("Performing smart chunking...")
@@ -177,8 +230,8 @@ class RAGPipeline:
 
     def _generate_answer(self, original_query: str, top_chunks: list[str]) -> str:
         context = "\n\n".join(top_chunks)
-        # Using your exact requested prompt
-        prompt = f"""You are answering a question using the following context from an insurance policy don't use knowldge which is not in context policy,make the answer breif and to the point.
+        prompt = f"""You are answering a question using the following context from an insurance policy. 
+Don't use knowledge which is not in the context. Keep the answer brief.
 
 Context:
 {context}
@@ -213,7 +266,6 @@ Answer:"""
             raise RuntimeError("Pipeline not ready.")
         
         with ThreadPoolExecutor() as executor:
-            # Map each question to the processing function
             answers = list(executor.map(self._process_single_question, questions))
             
         return answers
