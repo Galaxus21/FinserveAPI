@@ -102,6 +102,10 @@ async def run_submission(request_data: SubmissionRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An internal error occurred while processing the request: {str(e)}"
         )
+    
+@api_router.get('/')
+def read_welcome():
+    return {"Greet": "Welcome to Bajaj Finserv"}
 
 # --- Main FastAPI App ---
 app = FastAPI(
@@ -116,7 +120,3 @@ app.include_router(api_router)
 @app.get("/", summary="Health Check")
 def read_root():
     return {"status": "API is running."}
-
-@app.get("/api/v1")
-def read_welcome():
-    return {"Greet": "Welcome to Bajaj Finserv"}
