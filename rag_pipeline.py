@@ -26,6 +26,8 @@ from concurrent.futures import ThreadPoolExecutor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+nltk.data.path.append('/tmp/nltk_data')
+
 nltk.download("punkt_tab", quiet=True)
 
 class RAGPipeline:
