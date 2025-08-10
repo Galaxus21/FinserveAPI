@@ -258,6 +258,7 @@ Answer:"""
         retrieved = self._retrieve_chunks(question)
         reranked = self._rerank_chunks(question, retrieved)
         answer = self._generate_answer(question, reranked)
+        logger.info("Answer----> %s", answer)
         return answer
 
     def answer_questions(self, questions: list[str]) -> list[str]:
