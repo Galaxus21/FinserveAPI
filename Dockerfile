@@ -1,5 +1,4 @@
 # Use NVIDIA's official CUDA base image which includes the necessary GPU drivers.
-# This is the key change to enable GPU functionality.
 FROM nvidia/cuda:12.1.1-base-ubuntu22.04
 
 # Install Python, pip, venv, and other essential build tools into the base image.
@@ -27,21 +26,20 @@ ENV NLTK_DATA=/tmp/nltk_data
 COPY requirements.txt .
 
 # Install the Python dependencies from your requirements.txt file.
-# Because the container has CUDA, pip will automatically fetch the GPU-enabled
-# versions of libraries like PyTorch and faiss-gpu.
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Pre-download the sentence-transformer model during the build phase.
-# This prevents timeouts when the application starts.
+# Pre-download all models and data during the build phase.
 RUN python3 -c "from sentence_transformers import SentenceTransformer, CrossEncoder; import nltk; \
     SentenceTransformer('BAAI/bge-small-en-v1.5'); \
     CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2'); \
     nltk.download('punkt', download_dir='/tmp/nltk_data')"
+
 # Copy the rest of your application's source code into the container.
 COPY . .
 
-# Expose the port provided by Google Cloud Run.
-EXPOSE $PORT
+# Expose a fixed port. 8080 is a standard default for Cloud Run.
+EXPOSE 8000
 
-# Define the command to run your application using the installed uvicorn.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use the $PORT environment variable provided by Cloud Run at runtime.
+# The ${PORT:-8080} syntax provides a default value for local testing.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
